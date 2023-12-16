@@ -1,0 +1,876 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+class Program
+{
+    enum EmployeeDepartment
+    {
+        HR,
+        IT,
+        FINANCE,
+    }
+    enum EmployeePosition
+    {
+        HRDirector,
+        HRManager,
+        HRAssistant,
+
+        ITDeveloper,
+        ITManager,
+        ITSupport,
+
+        Accountant,
+        FinanceManager,
+        FinancialAnalyst,
+
+    }
+    interface IFileHandler
+    {
+        void SaveToFile(List<Employee> employees, string fileName);
+        List<Employee> ReadFromFile(string fileName);
+    }
+
+
+    abstract class Employee // Abstract base class representing an Employee
+    {
+        public string Name { get; set; }//ENCAPSULATION: For data control and integrity.
+        public int EmployeeID { get; set; }
+        public double HourlyRate { get; set; }
+        public double HoursWorked { get; set; }
+        public double GrossPay { get; set; }
+        public double IncomeTax { get; set; }
+        public double NetPay { get; set; }
+        public bool PayrollCalculated { get; set; } // New flag to track whether payroll is calculated
+        public bool IsDeleted { get; set; } // New flag to track whether the employee is deleted
+        public EmployeePosition Position { get; set; }
+        public EmployeeDepartment Department { get; set; }
+        public int Age { get; set; }
+        public string Address { get; set; }
+
+        public abstract double CalculatePayroll(double hoursWorked); // ABSTRACTION: Abstract method to calculate payroll, to be implemented by derived classes
+    }
+
+    class HourlyEmployee : Employee
+    {
+        public override double CalculatePayroll(double hoursWorked)
+        {
+            double grossPay = HourlyRate * hoursWorked;
+            double incomeTax = grossPay * 0.15; // Assuming a fixed tax rate of 15%
+            double netPay = grossPay - incomeTax;
+
+            HoursWorked = hoursWorked;
+            GrossPay = grossPay;
+            IncomeTax = incomeTax;
+            NetPay = netPay;
+            PayrollCalculated = true;
+
+            return netPay;
+        }
+
+    }
+
+    class FileHandler : IFileHandler // MULTIPLE INHERITANCE (interface): Filehandler class inherits from the IFilehandler interface
+    {
+        public void SaveToFile(List<Employee> employees, string fileName)
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(fileName))
+                {
+                    foreach (var employee in employees)
+                    {
+                        // Use a comma as a delimiter and add properties in the correct order
+                        writer.WriteLine($"{employee.Name},{employee.EmployeeID},{employee.Age},{employee.Address},{employee.Department},{employee.Position},{employee.HourlyRate}," +
+                                         $"{employee.HoursWorked},{employee.GrossPay},{employee.IncomeTax},{employee.NetPay},{employee.PayrollCalculated},{employee.IsDeleted}");
+                    }
+                }
+
+                Console.WriteLine($"Employee data saved to {fileName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while saving to file: {ex.Message}");
+            }
+        }
+
+        public List<Employee> ReadFromFile(string fileName)
+        {
+            List<Employee> loadedEmployees = new List<Employee>();
+
+            try
+            {
+                using (StreamReader reader = new StreamReader(fileName))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        Console.WriteLine($"Reading line: {line}");
+
+                        string[] data = line.Split(',');
+
+                        if (data.Length == 13) // Adjust the length to match the number of properties
+                        {
+                            HourlyEmployee employee = new HourlyEmployee
+                            {
+                                Name = data[0],
+                                EmployeeID = int.Parse(data[1]),
+                                Age = int.Parse(data[2]),
+                                Address = data[3],
+                                Department = (EmployeeDepartment)Enum.Parse(typeof(EmployeeDepartment), data[4].Trim()),
+                                Position = (EmployeePosition)Enum.Parse(typeof(EmployeePosition), data[5].Trim()),
+                                HourlyRate = double.Parse(data[6]),
+                                HoursWorked = double.Parse(data[7]),
+                                GrossPay = double.Parse(data[8]),
+                                IncomeTax = double.Parse(data[9]),
+                                NetPay = double.Parse(data[10]),
+                                PayrollCalculated = bool.Parse(data[11]),
+                                IsDeleted = bool.Parse(data[12])
+                            };
+
+                            loadedEmployees.Add(employee);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Invalid line format: {line}. Skipping...");
+                        }
+                    }
+                }
+
+                Console.WriteLine($"Employee data loaded from {fileName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while reading from file: {ex.Message}");
+            }
+
+            return loadedEmployees;
+        }
+    }
+
+
+    static List<Employee> employees = new List<Employee>();
+    static List<int> usedEmployeeIDs = new List<int>();
+    static IFileHandler fileHandler = new FileHandler();
+
+    static void Main(string[] args)
+    {
+        while (true)
+        {
+            Console.WriteLine("AutoPayCalc - Automated Payroll Calculator");
+            Console.WriteLine("------------------------------------------");
+            Console.WriteLine("1. Add Employee");
+            Console.WriteLine("2. Calculate Payroll");
+            Console.WriteLine("3. Update Employee");
+            Console.WriteLine("4. Delete Employee");
+            Console.WriteLine("5. View Payslips");
+            Console.WriteLine("6. Save to File");
+            Console.WriteLine("7. Load from File");
+            Console.WriteLine("8. Exit");
+            Console.Write("Enter your choice: ");
+
+            string choice = Console.ReadLine();
+            Console.Clear();
+            switch (choice)
+            {
+                case "1":
+                    AddEmployee();
+                    break;
+
+                case "2":
+                    CalculatePayroll();
+                    break;
+
+                case "3":
+                    UpdateEmployee();
+                    break;
+
+                case "4":
+                    DeleteEmployee();
+                    break;
+
+                case "5":
+                    ViewPayslips();
+                    break;
+
+                case "6":
+                    SaveToFile();
+                    break;
+
+                case "7":
+                    LoadFromFile();
+                    break;
+
+                case "8":
+                    Environment.Exit(0);
+                    break;
+
+                default:
+                    Console.WriteLine("Invalid choice. Please try again.");
+                    break;
+            }
+        }
+    }
+
+    static void AddEmployee()
+    {
+        try
+        {
+            Console.WriteLine("\nAdd Employee");
+            Console.WriteLine("-------------");
+
+            HourlyEmployee employee = new HourlyEmployee();
+
+            Console.WriteLine("Choose Employee Department:");
+            Console.WriteLine("a.HR");
+            Console.WriteLine("b.IT");
+            Console.WriteLine("c.FINANCE");
+
+            Console.Write("Enter your choice (a/b/c): ");
+            string departmentChoice = Console.ReadLine();
+            Console.Clear();
+            switch (departmentChoice.ToLower())
+            {
+                case "a":
+                    employee.Department = EmployeeDepartment.HR;
+                    Console.WriteLine("Choose Employee Position (Human-Resource Department):");
+                    Console.WriteLine("a.HR Director");
+                    Console.WriteLine("b.HR Manager");
+                    Console.WriteLine("c.HR Assistant");
+
+                    Console.Write("Enter your choice (a/b/c): ");
+                    string HRpositionChoice = Console.ReadLine();
+
+                    switch (HRpositionChoice.ToLower())
+                    {
+                        case "a":
+                            employee.Position = EmployeePosition.HRDirector;
+                            break;
+                        case "b":
+                            employee.Position = EmployeePosition.HRManager;
+                            break;
+                        case "c":
+                            employee.Position = EmployeePosition.HRAssistant;
+                            break;
+                        default:
+                            Console.WriteLine("Invalid position choice.");
+                            return;
+                    }
+                    break;
+                case "b":
+                    employee.Department = EmployeeDepartment.IT;
+                    Console.WriteLine("Choose Employee Position (Information Technology Department):");
+                    Console.WriteLine("a.IT Developer");
+                    Console.WriteLine("b.IT Manager");
+                    Console.WriteLine("c.IT Support");
+
+                    Console.Write("Enter your choice (a/b/c): ");
+                    string ITpositionChoice = Console.ReadLine();
+
+                    switch (ITpositionChoice.ToLower())
+                    {
+                        case "a":
+                            employee.Position = EmployeePosition.ITDeveloper;
+                            break;
+                        case "b":
+                            employee.Position = EmployeePosition.ITManager;
+                            break;
+                        case "c":
+                            employee.Position = EmployeePosition.ITSupport;
+                            break;
+                        default:
+                            Console.WriteLine("Invalid position choice.");
+                            return;
+                    }
+                    break;
+                case "c":
+                    employee.Department = EmployeeDepartment.FINANCE;
+                    Console.WriteLine("Choose Employee Position (Finance Department):");
+                    Console.WriteLine("a.Accountant");
+                    Console.WriteLine("b.Finance Manager");
+                    Console.WriteLine("c.Financial Analyst");
+
+                    Console.Write("Enter your choice (a/b/c): ");
+                    string FpositionChoice = Console.ReadLine();
+
+                    switch (FpositionChoice.ToLower())
+                    {
+                        case "a":
+                            employee.Position = EmployeePosition.Accountant;
+                            break;
+                        case "b":
+                            employee.Position = EmployeePosition.FinanceManager;
+                            break;
+                        case "c":
+                            employee.Position = EmployeePosition.FinancialAnalyst;
+                            break;
+                        default:
+                            Console.WriteLine("Invalid position choice.");
+                            return;
+                    }
+                    break;
+                default:
+                    Console.WriteLine("Invalid position choice.");
+                    return;
+            }
+
+            Console.Write("Enter Employee Name: ");
+            string employeeName = Console.ReadLine();
+
+            Console.Write("Enter Employee Age: ");
+            int employeeAge = int.Parse(Console.ReadLine());
+
+            Console.Write("Enter Employee Address: ");
+            string employeeAddress = Console.ReadLine();
+
+            if (string.IsNullOrWhiteSpace(employeeName) || !employeeName.All(char.IsLetter) && !employeeName.All(char.IsWhiteSpace))
+            {
+                throw new ArgumentException("Invalid employee name. Employee name cannot be empty, contain digits, or special characters.");
+            }
+
+            employee.Name = employeeName;
+            employee.Age = employeeAge;
+            employee.Address = employeeAddress;
+
+            int employeeID;
+            do
+            {
+                employeeID = GenerateUniqueEmployeeID();
+            } while (usedEmployeeIDs.Contains(employeeID));
+
+            usedEmployeeIDs.Add(employeeID);
+            employee.EmployeeID = employeeID;
+
+            Console.Write($"Employee ID: {employeeID}\n");
+
+            double minHourlyRate;
+            double maxHourlyRate;
+
+            switch (employee.Position)
+            {
+                //HR
+                case EmployeePosition.HRDirector:
+                    Console.WriteLine("Estimations/range of hourly rates for HR Director:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level HR Director): Around PHP 500 to PHP 800 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior HR Director): Around PHP 1,000 to PHP 1,500 per hour");
+                    minHourlyRate = 500;
+                    maxHourlyRate = 1500;
+                    break;
+                case EmployeePosition.HRManager:
+                    Console.WriteLine("Estimations/range of hourly rates for HR Manager:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level HR Manager): Around PHP 400 to PHP 600 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior HR Manager): Around PHP 700 to PHP 1,000 per hour");
+                    minHourlyRate = 400;
+                    maxHourlyRate = 1000;
+                    break;
+                case EmployeePosition.HRAssistant:
+                    Console.WriteLine("Estimations/range of hourly rates for HR Assistant:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level HR Assistant): Around PHP 300 to PHP 450 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior HR Assistant): Around PHP 500 to PHP 700 per hour");
+                    minHourlyRate = 300;
+                    maxHourlyRate = 700;
+                    break;
+
+                //IT
+                case EmployeePosition.ITDeveloper:
+                    Console.WriteLine("Estimations/range of hourly rates for IT Developer:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level IT Developer): Around PHP 600 to PHP 900 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior IT Developer): Around PHP 1,200 to PHP 1,800 per hour");
+                    minHourlyRate = 600;
+                    maxHourlyRate = 1800;
+                    break;
+                case EmployeePosition.ITManager:
+                    Console.WriteLine("Estimations/range of hourly rates for IT Manager:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level IT Manager): Around PHP 800 to PHP 1,200 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior IT Manager): Around PHP 1,500 to PHP 2,500 per hour");
+                    minHourlyRate = 800;
+                    maxHourlyRate = 2500;
+                    break;
+                case EmployeePosition.ITSupport:
+                    Console.WriteLine("Estimations/range of hourly rates for IT Support:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level IT Support): Around PHP 500 to PHP 800 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior HR IT Support): Around PHP 1,000 to PHP 1,500 per hour");
+                    minHourlyRate = 500;
+                    maxHourlyRate = 1500;
+                    break;
+
+                // FINANCE
+                case EmployeePosition.Accountant:
+                    Console.WriteLine("Estimations/range of hourly rates for Accountant:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level Accountant): Around PHP 700 to PHP 1,000 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior Accountant): Around PHP 1,200 to PHP 1,800 per hour");
+                    minHourlyRate = 700;
+                    maxHourlyRate = 1800;
+                    break;
+                case EmployeePosition.FinanceManager:
+                    Console.WriteLine("Estimations/range of hourly rates for FinanceManager:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level FinanceManager): Around PHP 800 to PHP 1,200 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior FinanceManager): Around PHP 1,500 to PHP 2,000 per hour");
+                    minHourlyRate = 800;
+                    maxHourlyRate = 2000;
+                    break;
+                case EmployeePosition.FinancialAnalyst:
+                    Console.WriteLine("Estimations/range of hourly rates for FinancialAnalyst:");
+                    Console.WriteLine("Minimum (Entry-Level to Mid-Level FinancialAnalyst): Around PHP 600 to PHP 900 per hour");
+                    Console.WriteLine("Maximum (Experienced or Senior FinancialAnalyst): Around PHP 1,000 to PHP 1,500 per hour");
+                    minHourlyRate = 600;
+                    maxHourlyRate = 1500;
+                    break;
+
+                default:
+                    minHourlyRate = 0;
+                    maxHourlyRate = 0;
+                    break;
+            }
+
+            Console.Write($"Enter Hourly Rate (between {minHourlyRate} and {maxHourlyRate}): Php");
+            double hourlyRate = double.Parse(Console.ReadLine());
+
+            if (hourlyRate < minHourlyRate || hourlyRate > maxHourlyRate)
+            {
+                throw new ArgumentException($"Hourly rate must be between {minHourlyRate} and {maxHourlyRate}.");
+            }
+
+            employee.HourlyRate = hourlyRate;
+
+            employees.Add(employee);
+
+            Console.WriteLine("\nEmployee Added Successfully!");
+        }
+        catch (FormatException)
+        {
+            Console.WriteLine("Invalid input format. Please enter a valid number.");
+        }
+        catch (ArgumentException ex)
+        {
+            Console.WriteLine($"Invalid input: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+
+
+    static int GenerateUniqueEmployeeID()
+    {
+        Random random = new Random();
+        return random.Next(1000, 9999);
+    }
+
+    static void CalculatePayroll() // Function to calculate payroll
+    {
+        try
+        {
+            Console.WriteLine("\nCalculate Payroll");
+            Console.WriteLine("-----------------");
+
+            // Display available employee IDs in a box at the top
+            Console.WriteLine("+-------------------------+");
+            Console.WriteLine("| Available Employee IDs  |");
+            Console.WriteLine("+-------------------------+");
+
+            foreach (var id in usedEmployeeIDs.Where(id => FindEmployeeByID(id) != null && !FindEmployeeByID(id).IsDeleted))
+            {
+                Console.WriteLine($"| {id,-23} |");
+            }
+
+            Console.WriteLine("+-------------------------+");
+
+            Console.Write("Enter Employee ID: ");
+            int employeeID = int.Parse(Console.ReadLine());
+
+            Employee employee = FindEmployeeByID(employeeID);
+
+            if (employee != null && !employee.PayrollCalculated && !employee.IsDeleted)
+            {
+                Console.Write($"Enter Hours Worked for {employee.Name}: ");
+                double hoursWorked = double.Parse(Console.ReadLine());
+
+                // Calculate net pay and display a payroll summary
+                double netPay = employee.CalculatePayroll(hoursWorked);
+
+                Console.WriteLine("\nPayroll Summary");
+                Console.WriteLine("---------------");
+                Console.WriteLine($"Employee Name: {employee.Name}");
+                Console.WriteLine($"Employee ID: {employee.EmployeeID}");
+                Console.WriteLine($"Age: {employee.Age}");
+                Console.WriteLine($"Address: {employee.Address}");
+                Console.WriteLine($"Department: {employee.Department}");
+                Console.WriteLine($"Position: {employee.Position}");
+                Console.WriteLine($"Hourly Rate: Php{employee.HourlyRate}");
+                Console.WriteLine($"Hours Worked: {hoursWorked} hours");
+            }
+            else
+            {
+                if (employee != null)
+                {
+                    if (employee.PayrollCalculated)
+                    {
+                        Console.WriteLine($"{employee.Name}'s payroll is already calculated.");
+                    }
+                    else if (employee.IsDeleted)
+                    {
+                        Console.WriteLine($"{employee.Name} is deleted and cannot be used for payroll calculation.");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Employee not found.");
+                }
+            }
+        }
+        catch (FormatException)
+        {
+            Console.WriteLine("Invalid input format. Please enter a valid number.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+
+
+    static void UpdateEmployee()
+    {
+        try
+        {
+            Console.WriteLine("\nUpdate Employee");
+            Console.WriteLine("-----------------");
+
+            // Display available employee IDs in a box at the top
+            Console.WriteLine("+-------------------------+");
+            Console.WriteLine("| Available Employee IDs  |");
+            Console.WriteLine("+-------------------------+");
+
+            foreach (var id in usedEmployeeIDs.Where(id => FindEmployeeByID(id) != null && !FindEmployeeByID(id).IsDeleted))
+            {
+                Console.WriteLine($"| {id,-23} |");
+            }
+
+            Console.WriteLine("+-------------------------+");
+
+            Console.Write("Enter Employee ID to update: ");
+            int employeeID = int.Parse(Console.ReadLine());
+
+            Employee employeeToUpdate = FindEmployeeByID(employeeID);
+
+            if (employeeToUpdate != null && !employeeToUpdate.IsDeleted)
+            {
+                Console.Write("Enter new Employee Name: ");
+                employeeToUpdate.Name = Console.ReadLine();
+
+                // Determine the employee's position and set the hourly rate accordingly
+                switch (employeeToUpdate.Position)
+                {
+                    case EmployeePosition.HRDirector:
+                        Console.Write($"Enter new Hourly Rate for HR Director (between 500 and 1500): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 500, 1500);
+                        break;
+
+                    case EmployeePosition.HRManager:
+                        Console.Write($"Enter new Hourly Rate for HR Manager (between 400 and 1000): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 400, 1000);
+                        break;
+
+                    case EmployeePosition.HRAssistant:
+                        Console.Write($"Enter new Hourly Rate for HR Assistant (between 300 and 700): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 300, 700);
+                        break;
+
+                    case EmployeePosition.ITDeveloper:
+                        Console.Write($"Enter new Hourly Rate for IT Developer (between 600 and 1800): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 600, 1800);
+                        break;
+
+                    case EmployeePosition.ITManager:
+                        Console.Write($"Enter new Hourly Rate for IT Manager (between 800 and 2500): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 800, 2500);
+                        break;
+
+                    case EmployeePosition.ITSupport:
+                        Console.Write($"Enter new Hourly Rate for IT Support (between 500 and 1500): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 500, 1500);
+                        break;
+
+                    case EmployeePosition.Accountant:
+                        Console.Write($"Enter new Hourly Rate for Accountant (between 700 and 1800): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 700, 1800);
+                        break;
+
+                    case EmployeePosition.FinanceManager:
+                        Console.Write($"Enter new Hourly Rate for Finance Manager (between 800 and 2000): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 800, 2000);
+                        break;
+
+                    case EmployeePosition.FinancialAnalyst:
+                        Console.Write($"Enter new Hourly Rate for Financial Analyst (between 600 and 1500): Php");
+                        employeeToUpdate.HourlyRate = ValidateHourlyRate(double.Parse(Console.ReadLine()), 600, 1500);
+                        break;
+
+                    default:
+                        Console.Write($"Enter new Hourly Rate: Php");
+                        employeeToUpdate.HourlyRate = double.Parse(Console.ReadLine());
+                        break;
+                }
+                employeeToUpdate.PayrollCalculated = false; // Set the flag to false when updating
+                Console.WriteLine("\nEmployee Updated Successfully!");
+            }
+            else
+            {
+                if (employeeToUpdate != null && employeeToUpdate.IsDeleted)
+                {
+                    Console.WriteLine($"{employeeToUpdate.Name} is deleted and cannot be updated.");
+                }
+                else
+                {
+                    Console.WriteLine("Employee not found.");
+                }
+            }
+        }
+        catch (FormatException)
+        {
+            Console.WriteLine("Invalid input format. Please enter a valid number.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+    static double ValidateHourlyRate(double input, double minValue, double maxValue)
+    {
+        while (input < minValue || input > maxValue)
+        {
+            Console.Write($"Hourly rate must be between {minValue} and {maxValue}. Enter a valid value: Php");
+            input = double.Parse(Console.ReadLine());
+        }
+        return input;
+    }
+    static void DeleteEmployee() // Function to delete an employee
+    {
+        try
+        {
+            Console.WriteLine("\nDelete Employee");
+            Console.WriteLine("-----------------");
+
+            // Display available employee IDs in a box at the top
+            Console.WriteLine("+-------------------------+");
+            Console.WriteLine("| Available Employee IDs  |");
+            Console.WriteLine("+-------------------------+");
+
+            foreach (var id in usedEmployeeIDs.Where(id => FindEmployeeByID(id) != null && !FindEmployeeByID(id).IsDeleted))
+            {
+                Console.WriteLine($"| {id,-23} |");
+            }
+
+            Console.WriteLine("+-------------------------+");
+
+            Console.Write("Enter Employee ID to delete: ");
+            int employeeID = int.Parse(Console.ReadLine());
+
+            Employee employeeToDelete = FindEmployeeByID(employeeID);
+
+            if (employeeToDelete != null && !employeeToDelete.IsDeleted)
+            {
+                employeeToDelete.IsDeleted = true; // Mark the employee as deleted
+                Console.WriteLine("Employee Deleted Successfully!");
+            }
+            else
+            {
+                if (employeeToDelete != null && employeeToDelete.IsDeleted)
+                {
+                    Console.WriteLine($"{employeeToDelete.Name} is already deleted.");
+                }
+                else
+                {
+                    Console.WriteLine("Employee not found.");
+                }
+            }
+        }
+        catch (FormatException)
+        {
+            Console.WriteLine("Invalid input format. Please enter a valid number.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
+    }
+
+    static void ViewPayslips()
+    {
+        Console.WriteLine("\nPayslip Summary");
+        Console.WriteLine("-----------------------------------------");
+
+        foreach (Employee employee in employees.Where(emp => emp.PayrollCalculated && !emp.IsDeleted))
+        {
+            Console.WriteLine($"| Employee Name:   {employee.Name,-20} ");
+            Console.WriteLine($"| Employee ID:     {employee.EmployeeID,-20} ");
+            Console.WriteLine($"| Age:             {employee.Age,-5}                ");
+            Console.WriteLine($"| Address:         {employee.Address,-20} ");
+            Console.WriteLine($"| Department:      {employee.Department,-20} ");
+            Console.WriteLine($"| Position:        {employee.Position} ({GetEmployeeLevel(employee)}) Level");
+            Console.WriteLine($"| Hourly Rate:     Php{employee.HourlyRate,-17} ");
+            Console.WriteLine($"| Hours Worked:    {employee.HoursWorked} hours              ");
+            Console.WriteLine($"| Gross Pay:       Php{employee.GrossPay,-17} ");
+            Console.WriteLine($"| Income Tax:      Php{employee.IncomeTax,-17} ");
+            Console.WriteLine($"| Net Pay:         Php{employee.NetPay,-17} ");
+            Console.WriteLine("-----------------------------------------");
+        }
+
+        if (employees.Any(emp => emp.PayrollCalculated && !emp.IsDeleted) == false)
+        {
+            Console.WriteLine("| No payroll has been calculated for active employees.");
+        }
+    }
+
+    static string GetEmployeeLevel(Employee employee)
+    {
+        // Determine the employee level based on hourly rates
+        if (employee.Position == EmployeePosition.HRDirector)
+        {
+            if (employee.HourlyRate >= 500 && employee.HourlyRate <= 800)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 800 && employee.HourlyRate <= 1500)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        else if (employee.Position == EmployeePosition.HRManager)
+        {
+            if (employee.HourlyRate >= 400 && employee.HourlyRate <= 600)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 600 && employee.HourlyRate <= 1000)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        else if (employee.Position == EmployeePosition.HRAssistant)
+        {
+            if (employee.HourlyRate >= 300 && employee.HourlyRate <= 450)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 450 && employee.HourlyRate <= 700)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        if (employee.Position == EmployeePosition.ITDeveloper)
+        {
+            if (employee.HourlyRate >= 600 && employee.HourlyRate <= 900)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 1200 && employee.HourlyRate <= 1800)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        else if (employee.Position == EmployeePosition.ITManager)
+        {
+            if (employee.HourlyRate >= 800 && employee.HourlyRate <= 1200)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 1500 && employee.HourlyRate <= 2500)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        else if (employee.Position == EmployeePosition.ITSupport)
+        {
+            if (employee.HourlyRate >= 500 && employee.HourlyRate <= 800)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 1000 && employee.HourlyRate <= 1500)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        if (employee.Position == EmployeePosition.Accountant)
+        {
+            if (employee.HourlyRate >= 700 && employee.HourlyRate <= 1000)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 1200 && employee.HourlyRate <= 1800)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        else if (employee.Position == EmployeePosition.FinanceManager)
+        {
+            if (employee.HourlyRate >= 800 && employee.HourlyRate <= 1200)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 1500 && employee.HourlyRate <= 2000)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        else if (employee.Position == EmployeePosition.FinancialAnalyst)
+        {
+            if (employee.HourlyRate >= 600 && employee.HourlyRate <= 900)
+            {
+                return "Entry to Mid-Level";
+            }
+            else if (employee.HourlyRate > 1000 && employee.HourlyRate <= 1500)
+            {
+                return "Experienced/Senior";
+            }
+        }
+        return "Unknown";
+    }
+
+    static void SaveToFile() // Function to save files
+    {
+        Console.Write("Enter file name to save: ");
+        string fileName = Console.ReadLine();
+
+        // Append .csv extension if not present
+        if (!fileName.ToLower().EndsWith(".csv"))
+        {
+            fileName += ".csv";
+        }
+
+        fileHandler.SaveToFile(employees, fileName);
+    }
+
+    static void LoadFromFile()
+    {
+        try
+        {
+            Console.Write("Enter file name to load: ");
+            string fileName = Console.ReadLine();
+
+            // Append .csv extension if not present
+            if (!fileName.ToLower().EndsWith(".csv"))
+            {
+                fileName += ".csv";
+            }
+
+            Console.WriteLine($"Loading employee data from file: {fileName}");
+
+            employees = fileHandler.ReadFromFile(fileName);
+
+            Console.WriteLine("Employee data loaded successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred while loading from file: {ex.Message}");
+        }
+    }
+
+    static Employee FindEmployeeByID(int employeeID)
+    {
+        return employees.FirstOrDefault(emp => emp.EmployeeID == employeeID);
+    }
+}
